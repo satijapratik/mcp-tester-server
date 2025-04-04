@@ -39,9 +39,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/mcp-server-tester.git"
+    "url": "https://github.com/r-huijts/mcp-server-tester.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/mcp-server-tester/issues"
+    "url": "https://github.com/r-huijts/mcp-server-tester/issues"
   }
 } 

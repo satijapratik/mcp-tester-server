@@ -29,7 +29,7 @@ Follow these steps to set up a development environment:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mcp-server-tester.git
+git clone https://github.com/r-huijts/mcp-server-tester.git
 cd mcp-server-tester
 
 # Install dependencies
