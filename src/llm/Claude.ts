@@ -23,7 +23,7 @@ Only return the query text with no additional explanation or formatting.`;
 
     const userPrompt = `Tool Name: ${tool.name}
 Description: ${tool.description || 'No description provided'}
-Parameters: ${JSON.stringify(tool.parameters || {}, null, 2)}
+Parameters: ${JSON.stringify(tool.inputSchema?.properties || {}, null, 2)}
 
 Please generate a natural language query that would lead an LLM to use this tool.`;
 
@@ -49,7 +49,7 @@ Return valid JSON with no explanation or comments.`;
 
     const userPrompt = `Tool Name: ${tool.name}
 Description: ${tool.description || 'No description provided'}
-Parameters: ${JSON.stringify(tool.parameters || {}, null, 2)}
+Parameters: ${JSON.stringify(tool.inputSchema?.properties || {}, null, 2)}
 Natural Language Query: "${naturalLanguageQuery}"
 
 Generate valid inputs for this tool as a JSON object. Ensure the generated inputs conform to the schema requirements.
@@ -89,7 +89,7 @@ Then, list 2-4 specific validation rules to verify the tool's response is correc
 
     const userPrompt = `Tool Name: ${tool.name}
 Description: ${tool.description || 'No description provided'}
-Parameters: ${JSON.stringify(tool.parameters || {}, null, 2)}
+Parameters: ${JSON.stringify(tool.inputSchema?.properties || {}, null, 2)}
 Test Inputs: ${JSON.stringify(inputs, null, 2)}
 
 Please provide:
@@ -101,8 +101,10 @@ Format your response as valid JSON with this structure:
   "expectedOutcome": "Brief description of what should happen",
   "validationRules": [
     {
-      "rule": "Rule description",
-      "validationFunction": "JavaScript function as string that takes (response) parameter and returns boolean"
+      "type": "contains",
+      "target": "path.to.field",
+      "value": "expected value",
+      "message": "Error message if validation fails"
     }
   ]
 }

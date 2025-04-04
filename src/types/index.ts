@@ -1,5 +1,3 @@
-import { ToolDefinition as SDKToolDefinition } from '@modelcontextprotocol/sdk';
-
 /**
  * Definition of a test case for an MCP tool
  */
@@ -68,15 +66,22 @@ export interface ToolResponse {
   };
 }
 
-// Use the SDK's ToolDefinition directly
-export { SDKToolDefinition as ToolDefinition };
+// Use the SDK's Tool interface from MCP
+export interface ToolDefinition {
+  name: string;
+  description?: string;
+  inputSchema: {
+    type: "object";
+    properties?: Record<string, any>;
+  };
+}
 
 /**
  * Wrapper for accessing MCP server tools
  */
 export interface MCPClientInterface {
   connect(serverPath: string): Promise<void>;
-  listTools(): SDKToolDefinition[];
+  listTools(): Promise<ToolDefinition[]>;
   executeTool(name: string, params: Record<string, any>): Promise<ToolResponse>;
   disconnect(): Promise<void>;
 }
@@ -85,7 +90,7 @@ export interface MCPClientInterface {
  * Generator for test cases
  */
 export interface TestGeneratorInterface {
-  generateTests(tools: SDKToolDefinition[], config: TesterConfig): Promise<TestCase[]>;
+  generateTests(tools: ToolDefinition[], config: TesterConfig): Promise<TestCase[]>;
 }
 
 /**

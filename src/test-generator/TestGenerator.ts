@@ -65,7 +65,7 @@ You are an expert in generating test cases for APIs. I'm providing you with a to
 ## Tool Definition
 Name: ${tool.name}
 Description: ${tool.description}
-Parameters: ${JSON.stringify(tool.parameters, null, 2)}
+Parameters: ${JSON.stringify(tool.inputSchema?.properties, null, 2)}
 
 ## Instructions
 1. Generate ${testsPerTool} diverse test cases that cover:

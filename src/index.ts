@@ -189,7 +189,7 @@ async function runTests() {
         await Promise.race([connectionPromise, timeoutPromise]);
         
         // Get available tools
-        const tools = client.listTools();
+        const tools = await client.listTools();
         console.log(`Found ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
         
         if (tools.length === 0) {
