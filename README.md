@@ -1,6 +1,23 @@
 # MCP Server Tester
 
+> **⚠️ WORK IN PROGRESS**: This project is under active development and has not been thoroughly tested yet. Features may be incomplete, contain bugs, or change significantly. Use at your own risk in non-production environments only.
+
 A powerful, configuration-driven testing tool for Model Context Protocol (MCP) servers. This project provides a comprehensive solution for validating, benchmarking, and ensuring reliability of MCP servers that integrate with AI models like Claude.
+
+## Current Status
+
+This tool is in early development stage with:
+- ✅ Basic configuration framework implemented
+- ✅ MCP server connection capabilities
+- ✅ Test generation using Claude AI
+- ✅ Natural language query generation for tests
+- ✅ Report generation in multiple formats
+- 🚧 Comprehensive test validation (in progress)
+- 🚧 Additional reporting options (in progress)
+- ❌ Full test coverage of the tool itself
+- ❌ Production hardening
+
+If you're interested in contributing, please feel free to open issues and submit pull requests.
 
 ## Introduction
 
