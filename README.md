@@ -382,6 +382,30 @@ If tool executions are failing:
 3. Verify the tool parameters are valid
 4. Increase the timeout if the tool takes longer to execute
 
+### Node.js Deprecation Warnings
+
+#### `punycode` Module Deprecation Warning
+
+If you encounter this warning:
+
+```
+(node:71439) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+```
+
+This is a harmless warning from Node.js about an internal module being deprecated. It doesn't affect the functionality of the MCP Server Tester. The warning comes from one of the dependencies and will be resolved in future updates.
+
+**Solutions:**
+
+1. **Ignore the warning** - It doesn't affect functionality
+2. **Suppress warnings** - Run with the `NODE_NO_WARNINGS=1` environment variable:
+   ```bash
+   NODE_NO_WARNINGS=1 mcp-server-tester
+   ```
+3. **Use the npm scripts** - The included npm scripts already suppress these warnings:
+   ```bash
+   npm start
+   ```
+
 ## Development
 
 To set up the development environment:
