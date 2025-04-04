@@ -1,15 +1,15 @@
+import { ToolDefinition as SDKToolDefinition } from '@modelcontextprotocol/sdk';
+
 /**
  * Definition of a test case for an MCP tool
  */
 export interface TestCase {
+  id: string;
   toolName: string;
   description: string;
-  inputs: Record<string, any>;
-  expectedOutcome: {
-    status: 'success' | 'error';
-    schema?: Record<string, any>;
-    validationRules?: ValidationRule[];
-  };
+  inputs: any;
+  expectedOutcome: string;
+  validationRules: ValidationRule[];
 }
 
 /**
@@ -19,7 +19,7 @@ export interface ValidationRule {
   type: 'contains' | 'matches' | 'hasProperty' | 'custom';
   target?: string;
   value?: any;
-  customValidator?: (response: any) => boolean;
+  custom?: (response: any) => boolean;
   message: string;
 }
 
@@ -30,8 +30,8 @@ export interface TestResult {
   testCase: TestCase;
   passed: boolean;
   response?: any;
-  validationErrors?: string[];
   executionTime?: number;
+  validationErrors: string[];
 }
 
 /**
@@ -46,13 +46,13 @@ export interface ValidationResult {
  * Configuration for the MCP server tester
  */
 export interface TesterConfig {
-  serverPath: string;
-  numTestsPerTool?: number;
-  timeoutMs?: number;
-  outputFormat?: 'json' | 'console' | 'html';
+  servers?: string[];         // Optional: specific servers to test (if not specified, all servers in mcpServers will be tested)
+  numTestsPerTool: number;
+  timeoutMs: number;
+  outputFormat: 'json' | 'console' | 'html';
   outputPath?: string;
   anthropicApiKey?: string;
-  verbose?: boolean;
+  verbose: boolean;
 }
 
 /**
@@ -67,25 +67,15 @@ export interface ToolResponse {
   };
 }
 
-/**
- * Tool definition with JSON schema
- */
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: {
-    type: string;
-    properties?: Record<string, any>;
-    required?: string[];
-  };
-}
+// Use the SDK's ToolDefinition directly
+export { SDKToolDefinition as ToolDefinition };
 
 /**
  * Wrapper for accessing MCP server tools
  */
 export interface MCPClientInterface {
   connect(serverPath: string): Promise<void>;
-  listTools(): ToolDefinition[];
+  listTools(): SDKToolDefinition[];
   executeTool(name: string, params: Record<string, any>): Promise<ToolResponse>;
   disconnect(): Promise<void>;
 }
@@ -94,7 +84,7 @@ export interface MCPClientInterface {
  * Generator for test cases
  */
 export interface TestGeneratorInterface {
-  generateTests(tools: ToolDefinition[], config: TesterConfig): Promise<TestCase[]>;
+  generateTests(tools: SDKToolDefinition[], config: TesterConfig): Promise<TestCase[]>;
 }
 
 /**

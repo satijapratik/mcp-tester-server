@@ -1,160 +1,362 @@
 # MCP Server Tester
 
-Automated testing tool for Model Context Protocol (MCP) servers
+A powerful, configuration-driven testing tool for Model Context Protocol (MCP) servers. This project provides a comprehensive solution for validating, benchmarking, and ensuring reliability of MCP servers that integrate with AI models like Claude.
 
-## Overview
+## Introduction
 
-MCP Server Tester is a command-line tool that helps you automatically test MCP servers by:
+The Model Context Protocol (MCP) enables AI models to access external tools and data sources through standardized interfaces. As MCP servers grow in complexity and importance, ensuring their correct functionality becomes critical. The MCP Server Tester addresses this need by:
 
-1. Connecting to an MCP server (local or remote)
-2. Discovering available tools
-3. Generating intelligent test cases using Claude
-4. Running tests against the server
-5. Validating responses
-6. Generating comprehensive reports
+- **Automating tests** for all tools exposed by an MCP server
+- **Leveraging Claude AI** to generate intelligent, contextually-relevant test cases
+- **Validating responses** against expected outcomes and schemas
+- **Providing detailed reports** to identify issues and performance bottlenecks
+
+This tool is designed for MCP server developers, AI integration teams, and quality assurance professionals who need to ensure their MCP implementations are robust, reliable, and correctly follow the protocol specifications.
+
+## Features
+
+- 🔍 Automatically discovers available tools from any MCP server
+- 🧪 Generates realistic test cases for each tool using Claude AI
+- ⚡ Executes tests and validates responses
+- 📊 Provides detailed test reports
+- 🔑 Supports multiple connection methods through configuration
+
+## Prerequisites
+
+- Node.js 18 or higher
+- An Anthropic API key for generating test cases
 
 ## Installation
 
-```bash
-# Install globally
-npm install -g mcp-server-tester
-
-# Or use npx directly
-npx mcp-server-tester -s your-server-package
-```
-
-## Usage
+Since this project is still in development, installation is done by cloning the repository:
 
 ```bash
-mcp-server-tester -s path/to/server -k your-anthropic-api-key
+# Clone the repository
+git clone https://github.com/username/mcp-server-tester.git
+cd mcp-server-tester
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Create a symbolic link to use it globally (optional)
+npm link
 ```
 
-### Options
+## Configuration-Based Usage
 
-```
--s, --server <path>      Path to MCP server executable, npm package, or host:port for socket connection (required)
--n, --num-tests <number> Number of tests to generate per tool (default: 3)
--t, --timeout <ms>       Timeout for each test in milliseconds (default: 10000)
--o, --output <path>      Path to output report file
--f, --format <format>    Output format (json, html, console) (default: console)
--k, --api-key <key>      Anthropic API key (can also be set via ANTHROPIC_API_KEY env var or .env file)
--v, --verbose            Enable verbose logging
--h, --help               Display help information
--V, --version            Display version number
-```
+The MCP Server Tester is designed to be driven entirely through configuration files. This approach offers several advantages:
 
-## Server Connection Methods
+- **Reusability**: Define your servers once, test them repeatedly
+- **Version control**: Check in your test configurations alongside your code
+- **Sharing**: Easily share server test configurations with team members
 
-The tool supports multiple ways to connect to MCP servers:
-
-### 1. NPM Package
-
-Use an NPM package name directly, and the tool will use npx to run it:
+### Basic Usage
 
 ```bash
-mcp-server-tester -s @modelcontextprotocol/server-filesystem
+# Initialize a default configuration file
+mcp-server-tester --init
+
+# Edit the configuration file to add your servers and settings
+
+# Create a .env file with your Anthropic API key
+echo "ANTHROPIC_API_KEY=your-api-key-here" > .env
+
+# Run tests using the configuration
+mcp-server-tester
+
+# Use a custom configuration file
+mcp-server-tester path/to/my-config.json
 ```
 
-### 2. Local Script
+### Configuration File Structure
 
-Use a path to a local script file:
+The configuration file (`mcp-servers.json`) controls all aspects of testing:
 
-```bash
-# JavaScript/TypeScript
-mcp-server-tester -s ./path/to/server.js
-
-# Python
-mcp-server-tester -s ./path/to/server.py
+```json
+{
+  "numTestsPerTool": 3,
+  "timeoutMs": 10000,
+  "outputFormat": "console",
+  "outputPath": "./reports/results.json",
+  "verbose": false,
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      "env": {
+        "DEBUG": "true"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-github-token-here"
+      }
+    },
+    "dev-server": {
+      "command": "node",
+      "args": ["/absolute/path/to/your/dev-server.js"],
+      "env": {
+        "DEBUG": "true",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
 ```
 
-### 3. Socket Connection
+By default, the tool will test all servers defined in the `mcpServers` section. If you want to test only specific servers, you can add an optional `servers` array:
 
-Connect to a server running on a specific host and port:
-
-```bash
-mcp-server-tester -s localhost:3000
+```json
+{
+  "servers": ["filesystem", "dev-server"],
+  "numTestsPerTool": 3,
+  // other settings...
+  "mcpServers": {
+    // server definitions...
+  }
+}
 ```
 
-## Examples
+### Configuration Options
 
-### Basic usage
+#### Test Settings
 
-```bash
-# Test a locally installed MCP server package
-mcp-server-tester -s @modelcontextprotocol/server-filesystem
+| Option | Description | Default |
+|--------|-------------|---------|
+| `servers` | Optional array of specific server names to test | All servers in `mcpServers` |
+| `numTestsPerTool` | Number of tests to generate per tool | 3 |
+| `timeoutMs` | Timeout for test execution in milliseconds | 10000 |
+| `outputFormat` | Format for test reports (`json`, `console`, `html`) | "console" |
+| `outputPath` | Path to output file | undefined |
+| `verbose` | Enable verbose logging | false |
 
-# Test an MCP server executable
-mcp-server-tester -s ./path/to/my-server.js
+#### Server Definitions
 
-# Test with custom settings
-mcp-server-tester -s my-server -n 5 -t 15000 -f html -o report.html
+The `mcpServers` section defines all available servers that can be tested:
+
+| Property | Description | Required |
+|----------|-------------|----------|
+| `command` | Executable or command to run | Yes |
+| `args` | Array of command-line arguments | Yes |
+| `env` | Environment variables to set | Yes |
+
+### Server Connection Types
+
+You can define various types of MCP servers in your configuration:
+
+#### NPM Package
+
+```json
+"npm-package": {
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-github"],
+  "env": {}
+}
 ```
 
-### API Key Management
+#### Local Script with Relative Path
 
-The tool provides several ways to provide your Anthropic API key:
-
-#### 1. Command Line Argument
-
-```bash
-mcp-server-tester -s your-server -k your-anthropic-api-key
+```json
+"python-script": {
+  "command": "python",
+  "args": ["./servers/custom_server.py"],
+  "env": {
+    "PORT": "8080"
+  }
+}
 ```
 
-#### 2. Environment Variable
+#### Local Script with Absolute Path
 
-```bash
-export ANTHROPIC_API_KEY=your-api-key
-mcp-server-tester -s your-server
+Useful for testing development versions of servers:
+
+```json
+"dev-server": {
+  "command": "node",
+  "args": ["/absolute/path/to/your/dev-server.js"],
+  "env": {
+    "DEBUG": "true",
+    "NODE_ENV": "development"
+  }
+}
 ```
 
-#### 3. .env File
+#### Socket Connection
 
-Create a `.env` file in your project directory (you can copy and modify the included `.env.example` file):
-
-```
-ANTHROPIC_API_KEY=your-api-key
-```
-
-Then run:
-
-```bash
-mcp-server-tester -s your-server
+```json
+"remote-socket": {
+  "command": "nc",
+  "args": ["localhost", "3000"],
+  "env": {}
+}
 ```
 
-The tool will automatically detect and use the API key from your .env file.
+## API Key Management
 
-## Test Case Generation
+For security reasons, your Anthropic API key should only be set in one of these ways:
 
-The tool uses Claude to automatically generate test cases for each tool in the MCP server. Test cases include:
+1. Environment variable: `ANTHROPIC_API_KEY=your-api-key`
+2. `.env` file in your project directory:
+   ```
+   ANTHROPIC_API_KEY=your-api-key
+   ```
 
-- Happy path tests with valid inputs
-- Edge case tests with boundary values
-- Error case tests with invalid inputs
+**Important**: Never put your API key in the configuration file, as it may be committed to version control.
 
-Each test case contains:
-- Description of what is being tested
+## Command-Line Options
+
+MCP Server Tester supports minimal command-line options:
+
+| Option | Description |
+|--------|-------------|
+| `--init` or `-i` | Create a default configuration file |
+| `--list` or `-l` | List all servers defined in your configuration |
+| `--help` or `-h` | Display help information |
+| `[config-path]` | Specify a custom configuration file path |
+
+## Test Generation Process
+
+The tool uses Claude AI to automatically generate appropriate test cases for each tool exposed by the MCP server:
+
+1. It discovers all available tools from the server
+2. For each tool, it analyzes:
+   - Tool name and description
+   - Required and optional parameters
+   - Parameter types and constraints
+3. Claude generates multiple test cases per tool:
+   - Happy path tests with valid inputs
+   - Edge case tests with boundary values
+   - Error case tests with invalid inputs
+
+Each test case includes:
+- Description of what's being tested
 - Input parameters
-- Expected outcome
-- Validation rules for checking the response
+- Expected outcome criteria
 
-## Test Validation
+## Test Execution and Validation
 
-The tester validates each response from the MCP server against expected outcomes, checking:
+For each server specified in the configuration (or all servers if none specified):
 
-1. Response status (success or error)
-2. Content validation using rules:
-   - `contains`: Check if a string/array contains a specific value
-   - `matches`: Verify exact value matches
-   - `hasProperty`: Check if an object has a specific property
-   - `custom`: Apply custom validation logic
+1. The tool connects to the server
+2. It discovers all available tools
+3. It generates test cases for each tool
+4. It executes each test case against the server
+5. It validates the responses against expected outcomes
+6. It generates a report of the results
 
-## Reports
+## Reporting Options
 
-The tool can generate reports in multiple formats:
+The tool can generate reports in multiple formats, controlled by the `outputFormat` configuration option:
 
-- **Console**: Displays results directly in the terminal
-- **JSON**: Outputs a structured JSON file for programmatic analysis
-- **HTML**: Creates a visual HTML report with detailed results
+### Console Output (Default)
+
+Displays test results directly in the terminal.
+
+### JSON Report
+
+Creates a structured JSON file at the path specified in `outputPath`.
+
+### HTML Report
+
+Generates an HTML report with visualizations at the path specified in `outputPath`.
+
+## Complete Examples
+
+### Basic Setup and Testing
+
+1. Create a default configuration file:
+   ```bash
+   mcp-server-tester --init
+   ```
+
+2. Edit the `mcp-servers.json` file to add your own servers and settings
+
+3. Create a `.env` file with your Anthropic API key:
+   ```bash
+   echo "ANTHROPIC_API_KEY=your-api-key-here" > .env
+   ```
+
+4. Run the tests:
+   ```bash
+   mcp-server-tester
+   ```
+
+### Testing a Dev Version of Your Server
+
+To test a development version of your MCP server:
+
+1. Add a configuration for your development server with the absolute path:
+
+```json
+{
+  "mcpServers": {
+    "my-dev-server": {
+      "command": "node",
+      "args": ["/path/to/your/project/dist/server.js"],
+      "env": {
+        "DEBUG": "true",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
+```
+
+2. Run the tests:
+```bash
+mcp-server-tester
+```
+
+### Testing Multiple Different Configurations
+
+You can maintain different configuration files for different testing scenarios:
+
+```bash
+# Create different config files for different environments
+cp mcp-servers.json config-dev.json
+cp mcp-servers.json config-prod.json
+
+# Edit each file with appropriate settings
+
+# Run tests with specific config
+mcp-server-tester ./config-dev.json
+mcp-server-tester ./config-prod.json
+```
+
+## Troubleshooting
+
+### Connection Issues
+
+If you're having trouble connecting to an MCP server:
+
+1. Verify the server configuration in your `mcp-servers.json` file
+2. Check if the server supports the MCP protocol
+3. Try increasing the `timeoutMs` for slower servers
+4. Enable verbose logging by setting `verbose: true`
+5. Check server process startup with environment variable `DEBUG=true`
+
+### API Key Issues
+
+If you encounter API key issues:
+
+1. Verify your Anthropic API key is valid
+2. Make sure the API key is correctly set in your environment or .env file
+3. Check for any spaces or extra characters in your API key
+4. Confirm that the .env file is in the correct location (project root)
+
+### Tool Execution Failures
+
+If tool executions are failing:
+
+1. Ensure your server implements the MCP protocol correctly
+2. Check the server logs for errors
+3. Verify the tool parameters are valid
+4. Increase the timeout if the tool takes longer to execute
 
 ## Development
 
@@ -162,45 +364,18 @@ To set up the development environment:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/mcp-server-tester.git
+git clone https://github.com/username/mcp-server-tester.git
 cd mcp-server-tester
 
 # Install dependencies
 npm install
 
-# Create your .env file from the example
+# Create your .env file
 cp .env.example .env
 # Edit .env and add your API key
 
-# Build the project
-npm run build
-
-# Run locally
-npm run dev -- -s your-server-package
-```
-
-## Troubleshooting
-
-### Connection Issues
-
-- For socket connections, verify the host and port are correct
-- For npx packages, ensure they're available in the npm registry
-- For local files, check file permissions and path validity
-
-### Tool Execution Timeouts
-
-If you're experiencing timeouts during tool execution, try:
-
-```bash
-mcp-server-tester -s your-server -t 30000  # Increase timeout to 30 seconds
-```
-
-### Verbose Logging
-
-For detailed logs to help diagnose issues:
-
-```bash
-mcp-server-tester -s your-server -v
+# Run the tool in development mode
+npm run dev
 ```
 
 ## License

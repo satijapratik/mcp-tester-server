@@ -1,186 +1,218 @@
-import { 
-  MCPServer, 
-  createStdioTransport,
-  createSocketTransport,
-  ServerSession,
-  ToolDefinition as MCPToolDefinition
-} from '@modelcontextprotocol/sdk';
+import { createModelContextProtocolClient, type ToolDefinition, type ModelContextProtocolResponse, type ExecuteToolParams, createStdioTransport, createNetworkTransport } from '@modelcontextprotocol/sdk';
 import { spawn } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import { 
-  MCPClientInterface, 
-  ToolDefinition, 
-  ToolResponse 
-} from '../types';
+import { ConfigLoader } from './ConfigLoader';
+import net from 'net';
 
 /**
  * Client for connecting to and interacting with MCP servers
  */
-export class MCPClient implements MCPClientInterface {
-  private server: MCPServer | null = null;
-  private session: ServerSession | null = null;
-  private tools: ToolDefinition[] = [];
+export class MCPClient {
+  private client: any = null;
   private serverProcess: any = null;
-
+  private configLoader: ConfigLoader = new ConfigLoader();
+  private socket: net.Socket | null = null;
+  
   /**
    * Connect to an MCP server
-   * @param serverPath Path to the server executable or npm package
+   * @param serverPathOrName Path to server executable, npm package, host:port for socket connection, or name from config
+   * @param configPath Optional path to config file
    */
-  async connect(serverPath: string): Promise<void> {
-    try {
-      // Check if serverPath exists
-      if (!serverPath) {
-        throw new Error('Server path is required');
-      }
-
-      let transport;
-      
-      // Determine server type and create appropriate transport
-      if (serverPath.includes(':')) {
-        // Socket transport (format: host:port)
-        const [host, portStr] = serverPath.split(':');
-        const port = parseInt(portStr);
-        
-        if (isNaN(port)) {
-          throw new Error('Invalid socket format. Expected host:port');
-        }
-        
-        transport = createSocketTransport({ host, port });
-      } else {
-        // Check if serverPath is a local file or npm package
-        const isJsPackage = !fs.existsSync(serverPath) || serverPath.startsWith('@');
-        
-        if (isJsPackage) {
-          // Assume it's an npm package
-          this.serverProcess = spawn('npx', ['--yes', serverPath], {
-            stdio: ['pipe', 'pipe', 'pipe']
-          });
-          
-          transport = createStdioTransport({
-            stdin: this.serverProcess.stdin,
-            stdout: this.serverProcess.stdout,
-          });
-        } else {
-          // Assume it's an executable or script
-          const ext = path.extname(serverPath);
-          
-          if (ext === '.js' || ext === '.ts') {
-            // For JS/TS scripts
-            this.serverProcess = spawn('node', [serverPath], {
-              stdio: ['pipe', 'pipe', 'pipe']
-            });
-          } else if (ext === '.py') {
-            // For Python scripts
-            this.serverProcess = spawn('python', [serverPath], {
-              stdio: ['pipe', 'pipe', 'pipe']
-            });
-          } else {
-            // For other executables
-            this.serverProcess = spawn(serverPath, [], {
-              stdio: ['pipe', 'pipe', 'pipe']
-            });
-          }
-          
-          transport = createStdioTransport({
-            stdin: this.serverProcess.stdin,
-            stdout: this.serverProcess.stdout,
-          });
-        }
-      }
-
-      // Create MCP server instance and connect
-      this.server = new MCPServer({ transport });
-      
-      // Initialize session
-      this.session = await this.server.createSession();
-
-      // Get available tools
-      const tools = await this.session.listTools();
-      this.tools = tools.map((tool: MCPToolDefinition) => this.convertToolDefinition(tool));
-
-      console.log(`Connected to MCP server with ${this.tools.length} available tools`);
-    } catch (error) {
-      console.error('Failed to connect to MCP server:', error);
-      await this.disconnect();
-      throw error;
+  async connect(serverPathOrName: string, configPath?: string): Promise<void> {
+    // Load config if provided
+    if (configPath) {
+      this.configLoader.loadConfig(configPath);
+    } else {
+      // Try to load config from default location
+      this.configLoader.loadConfig();
     }
+    
+    // Check if the server name is in the config
+    if (this.configLoader.hasServer(serverPathOrName)) {
+      return this.connectToConfiguredServer(serverPathOrName);
+    }
+    
+    // Check if it's a host:port connection
+    if (serverPathOrName.includes(':')) {
+      return this.connectToSocket(serverPathOrName);
+    }
+    
+    // Assume it's a path to an executable or an npm package
+    return this.connectToExecutable(serverPathOrName);
   }
-
+  
   /**
-   * List available tools from the connected MCP server
+   * Connect to a server defined in the config
+   */
+  private async connectToConfiguredServer(serverName: string): Promise<void> {
+    const serverProcess = this.configLoader.spawnServerProcess(serverName);
+    
+    if (!serverProcess) {
+      throw new Error(`Failed to spawn configured server: ${serverName}`);
+    }
+    
+    this.serverProcess = serverProcess;
+    
+    // Create transport
+    const transport = createStdioTransport({
+      stdin: serverProcess.stdin,
+      stdout: serverProcess.stdout,
+    });
+    
+    // Create client
+    this.client = createModelContextProtocolClient({ transport });
+    
+    // Handle server errors
+    serverProcess.on('error', (err: Error) => {
+      console.error(`Server process error: ${err.message}`);
+    });
+    
+    serverProcess.stderr.on('data', (data: Buffer) => {
+      console.error(`Server stderr: ${data.toString().trim()}`);
+    });
+    
+    // Wait for the client to be ready
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // Give the server a moment to start
+        resolve();
+      }, 500);
+    });
+  }
+  
+  /**
+   * Connect to a server via socket
+   */
+  private async connectToSocket(hostPort: string): Promise<void> {
+    const [host, portStr] = hostPort.split(':');
+    const port = parseInt(portStr, 10);
+    
+    if (!host || isNaN(port)) {
+      throw new Error(`Invalid host:port format: ${hostPort}`);
+    }
+    
+    return new Promise((resolve, reject) => {
+      this.socket = new net.Socket();
+      
+      const transport = createNetworkTransport({
+        socket: this.socket,
+      });
+      
+      this.client = createModelContextProtocolClient({ transport });
+      
+      this.socket.on('error', (err) => {
+        reject(new Error(`Socket connection error: ${err.message}`));
+      });
+      
+      this.socket.connect(port, host, () => {
+        console.log(`Connected to socket at ${host}:${port}`);
+        resolve();
+      });
+    });
+  }
+  
+  /**
+   * Connect to an executable or npm package
+   */
+  private async connectToExecutable(serverPath: string): Promise<void> {
+    let command: string;
+    let args: string[] = [];
+    
+    if (serverPath.startsWith('@') || !serverPath.includes('/')) {
+      // Assume it's an npm package
+      command = 'npx';
+      args = ['-y', serverPath];
+    } else {
+      // Assume it's a path to an executable
+      command = serverPath;
+    }
+    
+    const serverProcess = spawn(command, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    
+    this.serverProcess = serverProcess;
+    
+    const transport = createStdioTransport({
+      stdin: serverProcess.stdin,
+      stdout: serverProcess.stdout,
+    });
+    
+    this.client = createModelContextProtocolClient({ transport });
+    
+    // Handle errors
+    serverProcess.on('error', (err: Error) => {
+      throw new Error(`Failed to start server process: ${err.message}`);
+    });
+    
+    serverProcess.stderr.on('data', (data: Buffer) => {
+      console.error(`Server stderr: ${data.toString().trim()}`);
+    });
+    
+    // Wait for the process to start
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // Give the server a moment to start
+        resolve();
+      }, 500);
+    });
+  }
+  
+  /**
+   * List the available servers in the config
+   */
+  listConfiguredServers(): string[] {
+    return this.configLoader.getServerNames();
+  }
+  
+  /**
+   * Get available tools from the MCP server
    */
   listTools(): ToolDefinition[] {
-    if (!this.session) {
-      throw new Error('Not connected to an MCP server');
+    if (!this.client) {
+      throw new Error('Not connected to MCP server');
     }
-    return this.tools;
+    
+    return this.client.listFunctions();
   }
-
+  
   /**
-   * Execute a tool from the MCP server
-   * @param name Name of the tool to execute
+   * Execute a tool on the MCP server
+   * @param toolName Name of the tool to execute
    * @param params Parameters to pass to the tool
    */
-  async executeTool(name: string, params: Record<string, any>): Promise<ToolResponse> {
-    if (!this.session) {
-      throw new Error('Not connected to an MCP server');
+  async executeTool(toolName: string, params: any): Promise<ModelContextProtocolResponse> {
+    if (!this.client) {
+      throw new Error('Not connected to MCP server');
     }
-
-    try {
-      const startTime = Date.now();
-      const response = await this.session.callTool(name, params);
-      const executionTime = Date.now() - startTime;
-
-      return {
-        status: 'success',
-        data: response
-      };
-    } catch (error: any) {
-      return {
-        status: 'error',
-        error: {
-          message: error.message || 'Unknown error',
-          code: error.code
-        }
-      };
-    }
+    
+    const executeParams: ExecuteToolParams = {
+      name: toolName,
+      parameters: params,
+    };
+    
+    return await this.client.executeFunctionWithErrorParsing(executeParams);
   }
-
+  
   /**
-   * Disconnect from the MCP server and clean up resources
+   * Disconnect from the MCP server
    */
   async disconnect(): Promise<void> {
-    try {
-      if (this.session) {
-        await this.session.close();
-        this.session = null;
-      }
-
-      if (this.server) {
-        await this.server.close();
-        this.server = null;
-      }
-
-      if (this.serverProcess) {
+    // Close the socket if used
+    if (this.socket) {
+      this.socket.end();
+      this.socket = null;
+    }
+    
+    // Terminate the server process if applicable
+    if (this.serverProcess) {
+      try {
         this.serverProcess.kill();
         this.serverProcess = null;
+      } catch (error) {
+        console.error('Error killing server process:', error);
       }
-
-      this.tools = [];
-    } catch (error) {
-      console.error('Error disconnecting from MCP server:', error);
     }
-  }
-
-  /**
-   * Convert MCP tool definition to internal format
-   */
-  private convertToolDefinition(tool: MCPToolDefinition): ToolDefinition {
-    return {
-      name: tool.name,
-      description: tool.description || '',
-      parameters: tool.parameters
-    };
+    
+    this.client = null;
   }
 } 
