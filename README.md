@@ -30,6 +30,12 @@ The Model Context Protocol (MCP) enables AI models to access external tools and 
 
 This tool is designed for MCP server developers, AI integration teams, and quality assurance professionals who need to ensure their MCP implementations are robust, reliable, and correctly follow the protocol specifications.
 
+## Repository
+
+- **GitHub**: [https://github.com/r-huijts/mcp-server-tester](https://github.com/r-huijts/mcp-server-tester)
+- **Issues**: [https://github.com/r-huijts/mcp-server-tester/issues](https://github.com/r-huijts/mcp-server-tester/issues)
+- **License**: [MIT](LICENSE)
+
 ## Features
 
 - 🔍 Automatically discovers available tools from any MCP server
@@ -55,7 +61,7 @@ Since this project is still in development, installation is done by cloning the 
 
 ```bash
 # Clone the repository
-git clone https://github.com/username/mcp-server-tester.git
+git clone https://github.com/r-huijts/mcp-server-tester.git
 cd mcp-server-tester
 
 # Install dependencies
@@ -387,7 +393,7 @@ To set up the development environment:
 
 ```bash
 # Clone the repository
-git clone https://github.com/username/mcp-server-tester.git
+git clone https://github.com/r-huijts/mcp-server-tester.git
 cd mcp-server-tester
 
 # Install dependencies
