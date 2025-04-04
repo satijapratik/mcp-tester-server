@@ -11,6 +11,7 @@ import {
  */
 export class TestGenerator implements TestGeneratorInterface {
   private anthropic: Anthropic;
+  private model: string = process.env.CLAUDE_MODEL || 'claude-3-7-sonnet-20250219';
 
   /**
    * Create a new test generator
@@ -35,7 +36,7 @@ export class TestGenerator implements TestGeneratorInterface {
         const prompt = this.createPrompt(tool, testsPerTool);
         
         const response = await this.anthropic.completions.create({
-          model: 'claude-3-sonnet-20240229',
+          model: this.model,
           max_tokens_to_sample: 4000,
           prompt: `\n\nHuman: ${prompt}\n\nAssistant:`,
           temperature: 0.7
