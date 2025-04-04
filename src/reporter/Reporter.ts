@@ -17,62 +17,71 @@ export class Reporter implements ReporterInterface {
    * @param config Tester configuration
    */
   async generateReport(results: TestResult[], config: TesterConfig): Promise<void> {
-    // Log summary to console
-    this.logConsoleReport(results);
+    const format = config.outputFormat || 'console';
     
-    // Generate output file if requested
-    if (config.outputFormat && config.outputPath) {
-      await this.writeReport(results, config);
+    switch (format) {
+      case 'json':
+        await this.generateJsonReport(results, config);
+        break;
+      case 'html':
+        await this.generateHtmlReport(results, config);
+        break;
+      case 'console':
+      default:
+        this.generateConsoleReport(results);
+        break;
     }
+    
+    // Print summary
+    const totalTests = results.length;
+    const passedTests = results.filter(r => r.passed).length;
+    const failedTests = totalTests - passedTests;
+    const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
+    
+    console.log("\n=== Test Summary ===");
+    console.log(`Total Tests: ${totalTests}`);
+    console.log(`Passed: ${passedTests}`);
+    console.log(`Failed: ${failedTests}`);
+    console.log(`Pass Rate: ${passRate}%`);
   }
 
   /**
    * Log test results to console
    * @param results Test results to log
    */
-  private logConsoleReport(results: TestResult[]): void {
-    const passedCount = results.filter(r => r.passed).length;
-    const failedCount = results.length - passedCount;
-    const passRate = results.length > 0 ? Math.round((passedCount / results.length) * 100) : 0;
+  private generateConsoleReport(results: TestResult[]): void {
+    // We already log results during test execution, but we can enhance the output here
+    console.log("\n=== Detailed Test Results ===");
     
-    console.log('\n=======================================');
-    console.log('         MCP SERVER TEST REPORT        ');
-    console.log('=======================================');
-    console.log(`Total tests: ${results.length}`);
-    console.log(`Passed: ${chalk.green(passedCount)}`);
-    console.log(`Failed: ${chalk.red(failedCount)}`);
-    console.log(`Pass rate: ${chalk.yellow(passRate + '%')}`);
-    console.log('=======================================\n');
-
-    // Group results by tool
-    const toolResults = new Map<string, TestResult[]>();
+    // Group by tool
+    const groupedByTool: Record<string, TestResult[]> = {};
     
     for (const result of results) {
-      if (!toolResults.has(result.testCase.toolName)) {
-        toolResults.set(result.testCase.toolName, []);
+      const { toolName } = result.testCase;
+      if (!groupedByTool[toolName]) {
+        groupedByTool[toolName] = [];
       }
-      toolResults.get(result.testCase.toolName)!.push(result);
+      groupedByTool[toolName].push(result);
     }
-
-    // Print details for each tool
-    for (const [toolName, toolTestResults] of toolResults.entries()) {
-      const toolPassCount = toolTestResults.filter(r => r.passed).length;
-      const toolPassRate = Math.round((toolPassCount / toolTestResults.length) * 100);
+    
+    // Print results by tool
+    for (const [toolName, toolResults] of Object.entries(groupedByTool)) {
+      console.log(`\n## Tool: ${toolName}`);
       
-      console.log(chalk.bold(`Tool: ${toolName} (${toolPassCount}/${toolTestResults.length} - ${toolPassRate}%)\n`));
-      
-      for (const result of toolTestResults) {
-        const status = result.passed ? chalk.green('✓ PASS') : chalk.red('✗ FAIL');
-        console.log(`  ${status} ${result.testCase.description}`);
+      for (const result of toolResults) {
+        const { id, description, naturalLanguageQuery, inputs } = result.testCase;
+        const status = result.passed ? '✓ PASS' : '✗ FAIL';
+        const executionTime = result.executionTime ? `${result.executionTime}ms` : 'N/A';
+        
+        console.log(`\n[${status}] ${description} (${executionTime})`);
+        console.log(`ID: ${id}`);
+        console.log(`Natural Language Query: "${naturalLanguageQuery}"`);
+        console.log(`Inputs: ${JSON.stringify(inputs, null, 2)}`);
         
         if (!result.passed && result.validationErrors) {
-          for (const error of result.validationErrors) {
-            console.log(`    ${chalk.red('→')} ${error}`);
-          }
+          console.log(`Errors: ${result.validationErrors.join(', ')}`);
         }
       }
-      
-      console.log('');
     }
   }
 
@@ -81,229 +90,181 @@ export class Reporter implements ReporterInterface {
    * @param results Test results to write
    * @param config Tester configuration
    */
-  private async writeReport(results: TestResult[], config: TesterConfig): Promise<void> {
-    const outputPath = config.outputPath!;
+  private async generateJsonReport(results: TestResult[], config: TesterConfig): Promise<void> {
+    const outputPath = config.outputPath || 'mcp-test-report.json';
     
-    // Create directory if it doesn't exist
-    const outputDir = path.dirname(outputPath);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
+    const report = {
+      summary: {
+        totalTests: results.length,
+        passedTests: results.filter(r => r.passed).length,
+        failedTests: results.filter(r => !r.passed).length,
+        timestamp: new Date().toISOString()
+      },
+      results: results.map(result => ({
+        id: result.testCase.id,
+        toolName: result.testCase.toolName,
+        description: result.testCase.description,
+        naturalLanguageQuery: result.testCase.naturalLanguageQuery,
+        inputs: result.testCase.inputs,
+        passed: result.passed,
+        executionTime: result.executionTime,
+        validationErrors: result.validationErrors,
+        response: result.response
+      }))
+    };
+    
+    // Ensure directory exists
+    const dir = path.dirname(outputPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
     
-    // Write report based on format
-    switch (config.outputFormat) {
-      case 'json':
-        await fs.promises.writeFile(
-          outputPath,
-          JSON.stringify(results, null, 2),
-          'utf-8'
-        );
-        console.log(`JSON report written to: ${outputPath}`);
-        break;
-        
-      case 'html':
-        const htmlReport = this.generateHtmlReport(results);
-        await fs.promises.writeFile(outputPath, htmlReport, 'utf-8');
-        console.log(`HTML report written to: ${outputPath}`);
-        break;
-        
-      default:
-        const textReport = this.generateTextReport(results);
-        await fs.promises.writeFile(outputPath, textReport, 'utf-8');
-        console.log(`Text report written to: ${outputPath}`);
-    }
-  }
-
-  /**
-   * Generate a plain text report
-   * @param results Test results to report
-   */
-  private generateTextReport(results: TestResult[]): string {
-    const passedCount = results.filter(r => r.passed).length;
-    const failedCount = results.length - passedCount;
-    const passRate = results.length > 0 ? Math.round((passedCount / results.length) * 100) : 0;
-    
-    let report = '=======================================\n';
-    report += '         MCP SERVER TEST REPORT         \n';
-    report += '=======================================\n';
-    report += `Total tests: ${results.length}\n`;
-    report += `Passed: ${passedCount}\n`;
-    report += `Failed: ${failedCount}\n`;
-    report += `Pass rate: ${passRate}%\n`;
-    report += '=======================================\n\n';
-
-    // Group results by tool
-    const toolResults = new Map<string, TestResult[]>();
-    
-    for (const result of results) {
-      if (!toolResults.has(result.testCase.toolName)) {
-        toolResults.set(result.testCase.toolName, []);
-      }
-      toolResults.get(result.testCase.toolName)!.push(result);
-    }
-
-    // Add details for each tool
-    for (const [toolName, toolTestResults] of toolResults.entries()) {
-      const toolPassCount = toolTestResults.filter(r => r.passed).length;
-      const toolPassRate = Math.round((toolPassCount / toolTestResults.length) * 100);
-      
-      report += `Tool: ${toolName} (${toolPassCount}/${toolTestResults.length} - ${toolPassRate}%)\n\n`;
-      
-      for (const result of toolTestResults) {
-        const status = result.passed ? 'PASS' : 'FAIL';
-        report += `  [${status}] ${result.testCase.description}\n`;
-        
-        if (!result.passed && result.validationErrors) {
-          for (const error of result.validationErrors) {
-            report += `    → ${error}\n`;
-          }
-        }
-      }
-      
-      report += '\n';
-    }
-
-    return report;
+    // Write the report
+    fs.writeFileSync(outputPath, JSON.stringify(report, null, 2));
+    console.log(`JSON report written to: ${outputPath}`);
   }
 
   /**
    * Generate an HTML report
    * @param results Test results to report
    */
-  private generateHtmlReport(results: TestResult[]): string {
-    const passedCount = results.filter(r => r.passed).length;
-    const failedCount = results.length - passedCount;
-    const passRate = results.length > 0 ? Math.round((passedCount / results.length) * 100) : 0;
-
-    // Group results by tool
-    const toolResults = new Map<string, TestResult[]>();
+  private async generateHtmlReport(results: TestResult[], config: TesterConfig): Promise<void> {
+    const outputPath = config.outputPath || 'mcp-test-report.html';
+    
+    // Generate HTML content
+    const totalTests = results.length;
+    const passedTests = results.filter(r => r.passed).length;
+    const failedTests = totalTests - passedTests;
+    const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
+    
+    // Group by tool
+    const groupedByTool: Record<string, TestResult[]> = {};
     
     for (const result of results) {
-      if (!toolResults.has(result.testCase.toolName)) {
-        toolResults.set(result.testCase.toolName, []);
+      const { toolName } = result.testCase;
+      if (!groupedByTool[toolName]) {
+        groupedByTool[toolName] = [];
       }
-      toolResults.get(result.testCase.toolName)!.push(result);
+      groupedByTool[toolName].push(result);
     }
-
-    let toolSections = '';
     
-    for (const [toolName, toolTestResults] of toolResults.entries()) {
-      const toolPassCount = toolTestResults.filter(r => r.passed).length;
-      const toolPassRate = Math.round((toolPassCount / toolTestResults.length) * 100);
+    // Generate HTML
+    let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>MCP Server Test Report</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .summary { display: flex; gap: 20px; margin-bottom: 20px; }
+        .summary-item { padding: 10px; border-radius: 5px; min-width: 100px; text-align: center; }
+        .tool-section { margin-top: 30px; border: 1px solid #ddd; border-radius: 5px; padding: 10px; }
+        .test-case { margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .pass { background-color: #e6ffec; }
+        .fail { background-color: #ffebe9; }
+        .test-details { margin-top: 15px; font-family: monospace; white-space: pre-wrap; background: #f6f8fa; padding: 10px; border-radius: 5px; }
+        .query { background-color: #f0f7ff; padding: 10px; border-radius: 5px; margin: 10px 0; }
+      </style>
+    </head>
+    <body>
+      <h1>MCP Server Test Report</h1>
+      <p>Generated on: ${new Date().toLocaleString()}</p>
       
-      let testRows = '';
+      <div class="summary">
+        <div class="summary-item" style="background-color: #f0f7ff;">
+          <div>Total Tests</div>
+          <h2>${totalTests}</h2>
+        </div>
+        <div class="summary-item" style="background-color: #e6ffec;">
+          <div>Passed</div>
+          <h2>${passedTests}</h2>
+        </div>
+        <div class="summary-item" style="background-color: #ffebe9;">
+          <div>Failed</div>
+          <h2>${failedTests}</h2>
+        </div>
+        <div class="summary-item" style="background-color: #f6f8fa;">
+          <div>Pass Rate</div>
+          <h2>${passRate}%</h2>
+        </div>
+      </div>
+    `;
+    
+    // Add tool sections
+    for (const [toolName, toolResults] of Object.entries(groupedByTool)) {
+      const toolPassRate = Math.round((toolResults.filter(r => r.passed).length / toolResults.length) * 100);
       
-      for (const result of toolTestResults) {
-        const statusClass = result.passed ? 'success' : 'danger';
-        const statusText = result.passed ? 'PASS' : 'FAIL';
+      html += `
+      <div class="tool-section">
+        <h2>Tool: ${toolName}</h2>
+        <div>Pass Rate: ${toolPassRate}% (${toolResults.filter(r => r.passed).length}/${toolResults.length})</div>
+      `;
+      
+      // Add test cases
+      for (const result of toolResults) {
+        const { id, description, naturalLanguageQuery, inputs } = result.testCase;
+        const status = result.passed ? 'PASS' : 'FAIL';
+        const executionTime = result.executionTime ? `${result.executionTime}ms` : 'N/A';
         
-        let errorDetails = '';
-        if (!result.passed && result.validationErrors && result.validationErrors.length > 0) {
-          errorDetails = `
-            <div class="error-details">
-              <ul>
-                ${result.validationErrors.map(error => `<li>${error}</li>`).join('')}
-              </ul>
-            </div>
+        html += `
+        <div class="test-case ${result.passed ? 'pass' : 'fail'}">
+          <h3>${status}: ${description}</h3>
+          <div>ID: ${id}</div>
+          <div>Execution Time: ${executionTime}</div>
+          <div class="query">
+            <strong>Natural Language Query:</strong>
+            <p>${this.escapeHtml(naturalLanguageQuery)}</p>
+          </div>
+          <div class="test-details">
+            <div>Inputs:</div>
+            <pre>${JSON.stringify(inputs, null, 2)}</pre>
           `;
-        }
-        
-        testRows += `
-          <tr>
-            <td><span class="badge bg-${statusClass}">${statusText}</span></td>
-            <td>${result.testCase.description}</td>
-            <td><pre>${JSON.stringify(result.testCase.inputs, null, 2)}</pre></td>
-            <td>${errorDetails}</td>
-          </tr>
+          
+          if (result.response) {
+            html += `
+            <div>Response:</div>
+            <pre>${JSON.stringify(result.response, null, 2)}</pre>
+            `;
+          }
+          
+          if (!result.passed && result.validationErrors) {
+            html += `
+            <div>Validation Errors:</div>
+            <pre>${this.escapeHtml(result.validationErrors.join('\n'))}</pre>
+            `;
+          }
+          
+          html += `
+          </div>
+        </div>
         `;
       }
       
-      toolSections += `
-        <div class="card mb-4">
-          <div class="card-header">
-            <h5>Tool: ${toolName}</h5>
-            <div class="tool-stats">
-              <span class="badge bg-primary">${toolPassCount}/${toolTestResults.length} - ${toolPassRate}%</span>
-            </div>
-          </div>
-          <div class="card-body">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Description</th>
-                  <th>Inputs</th>
-                  <th>Errors</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${testRows}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
+      html += `</div>`;
     }
-
-    return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MCP Server Test Report</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    .summary-card {
-      background-color: #f8f9fa;
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-    .summary-stat {
-      text-align: center;
-      padding: 10px;
-    }
-    .error-details {
-      font-size: 14px;
-      color: #dc3545;
-    }
-    pre {
-      font-size: 12px;
-      max-height: 100px;
-      overflow-y: auto;
-    }
-  </style>
-</head>
-<body>
-  <div class="container mt-4 mb-5">
-    <h1 class="mb-4">MCP Server Test Report</h1>
     
-    <div class="summary-card">
-      <div class="row">
-        <div class="col-md-3 summary-stat">
-          <h3>${results.length}</h3>
-          <p>Total Tests</p>
-        </div>
-        <div class="col-md-3 summary-stat">
-          <h3 class="text-success">${passedCount}</h3>
-          <p>Passed</p>
-        </div>
-        <div class="col-md-3 summary-stat">
-          <h3 class="text-danger">${failedCount}</h3>
-          <p>Failed</p>
-        </div>
-        <div class="col-md-3 summary-stat">
-          <h3 class="text-primary">${passRate}%</h3>
-          <p>Pass Rate</p>
-        </div>
-      </div>
-    </div>
-    
-    ${toolSections}
-  </div>
-</body>
-</html>
+    html += `
+    </body>
+    </html>
     `;
+    
+    // Ensure directory exists
+    const dir = path.dirname(outputPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    // Write the report
+    fs.writeFileSync(outputPath, html);
+    console.log(`HTML report written to: ${outputPath}`);
+  }
+  
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 } 

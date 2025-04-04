@@ -20,6 +20,12 @@ This tool is designed for MCP server developers, AI integration teams, and quali
 - ⚡ Executes tests and validates responses
 - 📊 Provides detailed test reports
 - 🔑 Supports multiple connection methods through configuration
+- **Configuration-Based**: Simple JSON configuration for defining MCP servers to test
+- **Multiple Server Support**: Test multiple MCP servers at once
+- **Comprehensive Testing**: Tests all tools exposed by each server
+- **Natural Language Context**: Includes the user query that would trigger each tool, providing real-world context
+- **Detailed Reports**: Generate reports in console, JSON, or HTML formats
+- **Secure**: Keeps API keys in environment variables, not in configuration files
 
 ## Prerequisites
 
