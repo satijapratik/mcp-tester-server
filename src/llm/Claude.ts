@@ -1,13 +1,14 @@
-import axios from 'axios';
+import { Anthropic } from '@anthropic-ai/sdk';
 import { ToolDefinition, ValidationRule } from '../types';
 
 export class Claude {
-  private apiKey: string;
-  private baseUrl: string = 'https://api.anthropic.com/v1/messages';
-  private model: string = 'claude-3-sonnet-20240229';
+  private anthropic: Anthropic;
+  private model: string = process.env.CLAUDE_MODEL || 'claude-3-7-sonnet-20250219';
 
   constructor(apiKey: string) {
-    this.apiKey = apiKey;
+    this.anthropic = new Anthropic({
+      apiKey: apiKey,
+    });
   }
 
   /**
@@ -136,31 +137,23 @@ Only return the JSON with no additional explanation.`;
    */
   private async sendPrompt(systemPrompt: string, userPrompt: string): Promise<string> {
     try {
-      const response = await axios.post(
-        this.baseUrl,
-        {
-          model: this.model,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
-          temperature: 0.7,
-          max_tokens: 1000
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.apiKey,
-            'anthropic-version': '2023-06-01'
-          }
-        }
-      );
+      const message = await this.anthropic.messages.create({
+        model: this.model,
+        system: systemPrompt,
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
 
-      return response.data.content[0].text;
+      // Find the first text block in the content
+      const textBlock = message.content.find(block => 'text' in block);
+      
+      if (textBlock && 'text' in textBlock) {
+        return textBlock.text;
+      } else {
+        throw new Error('No text content in the response');
+      }
     } catch (error) {
       console.error('Error calling Anthropic API:', error);
-      if (axios.isAxiosError(error) && error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-      }
       throw new Error(`Failed to get response from Claude: ${error}`);
     }
   }

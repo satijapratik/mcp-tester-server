@@ -85,11 +85,6 @@ The MCP Server Tester is designed to be driven entirely through configuration fi
 ### Basic Usage
 
 ```bash
-# Initialize a default configuration file
-mcp-server-tester --init
-
-# Edit the configuration file to add your servers and settings
-
 # Create a .env file with your Anthropic API key
 echo "ANTHROPIC_API_KEY=your-api-key-here" > .env
 
