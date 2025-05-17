@@ -36,9 +36,18 @@ MCP Server Tester - Configuration-based testing tool for MCP servers
 
 Usage:
   mcp-server-tester [config-path]
+  mcp-server-tester api-test <api-doc-path> <server-name>
+
+Commands:
+  api-test    Test an API document against an MCP server
+  --help      Show this help message
+  --list      List available MCP servers
+  --init      Create a default configuration file
 
 Arguments:
   config-path  Optional path to configuration file (defaults to mcp-servers.json in the current directory)
+  api-doc-path Path to the API document in JSON format
+  server-name  Name of the MCP server to test against
 
 Examples:
   # Use default config file in current directory
@@ -46,6 +55,9 @@ Examples:
   
   # Use custom config file
   mcp-server-tester ./configs/my-mcp-config.json
+  
+  # Test API document against a server
+  mcp-server-tester api-test ./api-docs/openapi.json filesystem
 
 Learn more: https://github.com/username/mcp-server-tester
 `);
@@ -81,6 +93,17 @@ async function runTests() {
     // Handle help flag
     if (process.argv.includes('--help') || process.argv.includes('-h')) {
       printUsage();
+      return;
+    }
+
+    // Handle API testing command
+    if (process.argv[2] === 'api-test') {
+      const apiTestPath = path.join(__dirname, 'api-tester', 'cli.js');
+      if (!fs.existsSync(apiTestPath)) {
+        console.error('Error: API tester module not found. Please run "npm run build" first.');
+        process.exit(1);
+      }
+      require(apiTestPath);
       return;
     }
     
