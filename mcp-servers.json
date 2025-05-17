@@ -16,28 +16,8 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-github-token-here"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
       }
-    },
-    "custom-python": {
-      "command": "python",
-      "args": ["./servers/my_server.py"],
-      "env": {
-        "PORT": "8080"
-      }
-    },
-    "dev-server": {
-      "command": "node",
-      "args": ["/absolute/path/to/your/dev-server.js"],
-      "env": {
-        "DEBUG": "true",
-        "NODE_ENV": "development"
-      }
-    },
-    "remote-server": {
-      "command": "nc",
-      "args": ["localhost", "3000"],
-      "env": {}
     }
   }
 } 
